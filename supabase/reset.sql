@@ -1,9 +1,25 @@
 -- Khatape — DANGER: drops all Khatape tables/types/functions so schema.sql can
--- recreate them cleanly. Safe now (no real data). Run this FIRST, then schema.sql, then seed.sql.
+-- recreate them cleanly. LOCAL / DEV ONLY — NEVER run on production.
 -- It does NOT delete your Authentication users.
 --
 -- Order matters: drop the trigger, then the TABLES (cascade removes their RLS
 -- policies), THEN the functions (policies depended on them).
+
+-- ========================== SAFETY GUARD ==========================
+-- Refuses to run unless this database is explicitly marked as DEV
+-- (run dev-marker.sql once on a local/dev DB). Production never has the marker,
+-- so pasting this into a prod SQL editor aborts instead of wiping data.
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = '_khatape_env'
+  ) or not exists (select 1 from public._khatape_env where env = 'dev') then
+    raise exception
+      'SAFETY: this is not a dev database (no dev marker). reset.sql aborted to protect production data.';
+  end if;
+end $$;
+-- ==================================================================
 
 drop trigger if exists on_auth_user_created on auth.users;
 drop view if exists customer_balances;

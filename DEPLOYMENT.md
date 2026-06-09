@@ -92,6 +92,46 @@ project under Authentication → Users.
 
 ---
 
+## 4b. Local dev (Option A — Supabase on your machine, FREE)
+
+Until a second cloud project is worth it, **local = dev**. It runs entirely on your machine
+(Docker), so it can never touch the cloud (prod) project. Requires **Docker Desktop running**.
+
+**One-time:**
+```bash
+npx supabase init        # generates supabase/config.toml (keep existing files)
+npx supabase start       # boots local Postgres + Auth + Studio (first run pulls images)
+```
+`supabase start` prints a local **API URL** (`http://127.0.0.1:54321`), an **anon key**, and the
+**Studio URL** (`http://127.0.0.1:54323`). Migrations in `supabase/migrations/` are applied automatically.
+
+**Make a local super-admin + mark the DB as dev:**
+1. Open local **Studio** → Authentication → **Add user** (your email + password — auto-confirmed locally).
+2. Studio → SQL Editor → run:
+   ```sql
+   update app_users set role='super_admin', tenant_id=null
+   where id in (select id from auth.users where email='YOUR@EMAIL');
+   ```
+3. Studio → SQL Editor → run `supabase/dev-marker.sql` (marks this DB as dev → lets `reset.sql` run here).
+
+**Point the app at local:** set `.env.local` to the values `supabase start` printed:
+```
+VITE_SUPABASE_URL=http://127.0.0.1:54321
+VITE_SUPABASE_ANON_KEY=<anon key from supabase start>
+```
+Then `npm run dev` → you'll see the amber **● LOCAL DEV** badge → log in → create a test shop from the
+console. (To test the login-management feature locally: `npx supabase functions serve manage-tenant-users`.)
+
+**Wipe & restart local anytime (safe — it's local):**
+```bash
+npx supabase db reset    # re-applies migrations on the local DB
+```
+`reset.sql` is only needed for the dashboard SQL-editor flow; locally `db reset` does the same.
+
+> **The golden rule:** `.env.local` and Supabase local = **dev**. The cloud project = **prod**, only
+> ever changed via tested migration files. The **LOCAL DEV badge** + the **reset.sql safety guard**
+> (refuses without the dev marker) make it impossible to confuse them or wipe prod by accident.
+
 ## 5. Production data safety net
 
 - **Supabase Pro → enable Daily Backups + Point-in-Time Recovery (PITR)** on khatape-prod. Any

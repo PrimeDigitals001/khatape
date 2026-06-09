@@ -30,10 +30,24 @@ function RoleRedirect() {
   return null;
 }
 
+// Visible badge whenever the app is pointed at a LOCAL Supabase (dev), so you can
+// never mistake local dev for the live production site.
+const IS_LOCAL_DB = /localhost|127\.0\.0\.1/.test(import.meta.env.VITE_SUPABASE_URL || "");
+
+function DevBadge() {
+  if (!IS_LOCAL_DB) return null;
+  return (
+    <div className="fixed bottom-2 left-2 z-[100] bg-amber-500 text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-lg pointer-events-none">
+      ● LOCAL DEV
+    </div>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <DevBadge />
         <Routes>
           <Route path="/" element={<RoleRedirect />} />
           <Route path="/login" element={<Login />} />
