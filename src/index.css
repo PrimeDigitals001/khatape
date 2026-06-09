@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Khatape design foundation — Clean SaaS (light), emerald accent
+   ============================================================ */
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+@layer components {
+  /* Surfaces */
+  .k-card {
+    @apply bg-white rounded-2xl border border-slate-200/70 shadow-sm;
+  }
+
+  /* Buttons */
+  .k-btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold px-4 py-2.5
+      bg-red-600 text-white hover:bg-red-700 transition-colors shadow-sm
+      disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .k-btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold px-4 py-2.5
+      bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors
+      disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .k-btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl font-semibold px-4 py-2.5
+      bg-red-500 text-white hover:bg-red-600 transition-colors
+      disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Inputs */
+  .k-input {
+    @apply w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900
+      placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500
+      focus:border-red-500 transition-shadow;
+  }
+
+  /* Chips / badges */
+  .k-chip {
+    @apply inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full;
+  }
+}
+
+/* Login page blob animation (kept, retoned in component) */
+@keyframes blob {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+.animate-blob { animation: blob 7s infinite; }
+.animation-delay-2000 { animation-delay: 2s; }
+.animation-delay-4000 { animation-delay: 4s; }

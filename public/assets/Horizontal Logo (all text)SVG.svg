@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2500 1100.67">
+  <defs>
+    <style>
+      .cls-1 {
+        font-size: 65.7px;
+      }
+
+      .cls-1, .cls-2 {
+        fill: #fff;
+        font-family: FarkeyRegular, Farkey;
+      }
+
+      .cls-3 {
+        fill: #9fa6ac;
+      }
+
+      .cls-4 {
+        letter-spacing: -.07em;
+      }
+
+      .cls-5 {
+        fill: none;
+      }
+
+      .cls-6 {
+        letter-spacing: -.09em;
+      }
+
+      .cls-7 {
+        letter-spacing: 0em;
+      }
+
+      .cls-8 {
+        fill: #18b2c8;
+      }
+
+      .cls-9 {
+        fill: #feffff;
+      }
+
+      .cls-2 {
+        font-size: 200px;
+      }
+    </style>
+  </defs>
+  <g>
+    <polygon class="cls-9" points="548.64 434 548.64 485.77 463.42 440.61 434.28 456.44 430.93 458.25 373.39 489.52 430.93 520.01 443.43 526.64 443.43 578.4 329.27 517.91 329.27 461.44 414.92 414.9 463.15 388.7 511.65 414.4 548.64 434"/>
+    <polygon class="cls-5" points="463.62 537.34 463.62 589.1 463.61 589.09 463.61 537.33 463.62 537.34"/>
+    <polygon class="cls-5" points="644.92 613.42 644.92 613.43 644.92 613.43 644.92 613.42"/>
+    <rect class="cls-5" x="463.61" y="537.33" width=".01" height="59.29"/>
+    <polygon class="cls-5" points="463.61 711.94 463.61 711.97 463.57 711.96 463.61 711.94"/>
+    <polygon class="cls-3" points="463.61 537.33 463.61 589.09 443.43 578.4 443.43 526.64 446.68 528.36 463.61 537.33"/>
+    <rect class="cls-5" x="463.61" y="537.33" width=".01" height="59.29"/>
+    <polygon class="cls-5" points="463.61 660.16 463.61 660.21 463.56 660.19 463.61 660.16"/>
+    <polygon class="cls-9" points="644.92 561.67 644.92 613.42 644.92 613.43 529.54 676.12 529.54 624.34 596.67 587.86 509.35 541.59 476.67 524.27 476.67 472.5 644.9 561.65 644.92 561.67"/>
+    <polygon class="cls-3" points="529.54 624.34 529.54 676.12 511.81 685.75 509.35 687.08 509.35 635.3 529.54 624.34"/>
+    <polygon class="cls-5" points="644.92 561.65 644.92 561.67 644.9 561.65 644.92 561.65"/>
+    <polygon class="cls-8" points="509.35 561.57 509.35 687.08 463.61 711.94 463.61 596.62 463.62 596.62 463.62 537.34 509.35 561.57"/>
+    <polygon class="cls-3" points="463.61 660.21 463.61 711.94 463.57 711.96 443.42 701.28 443.42 649.52 463.56 660.19 463.61 660.21"/>
+    <polygon class="cls-9" points="443.42 649.52 443.42 701.28 415.33 686.39 367.97 661.3 367.97 609.53 443.42 649.52"/>
+    <polygon class="cls-5" points="463.61 711.94 463.61 711.97 463.57 711.96 463.61 711.94"/>
+  </g>
+  <text class="cls-2" transform="translate(682.16 572.55)"><tspan x="0" y="0">PRIME DIGI</tspan><tspan class="cls-6" x="1028.38" y="0">T</tspan><tspan x="1141.58" y="0">ALS</tspan></text>
+  <text class="cls-1" transform="translate(989.67 665.88)"><tspan x="0" y="0">Turning vision into </tspan><tspan class="cls-4" x="628.93" y="0">v</tspan><tspan class="cls-7" x="658.75" y="0">alue</tspan></text>
+</svg>

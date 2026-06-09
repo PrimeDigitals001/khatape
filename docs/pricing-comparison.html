@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Khatape — Backend Cost Comparison</title>
+<style>
+  :root{
+    --bg:#0f172a; --card:#ffffff; --ink:#0f172a; --muted:#64748b;
+    --line:#e2e8f0; --accent:#E54A4A; --green:#16a34a; --amber:#f59e0b; --red:#dc2626;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:#f1f5f9; color:var(--ink); line-height:1.5; padding:32px 16px;
+  }
+  .wrap{max-width:980px;margin:0 auto;}
+  h1{font-size:28px;margin:0 0 4px;letter-spacing:-.02em;}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 24px;}
+  .assump{
+    background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 20px;margin-bottom:28px;
+    display:flex;flex-wrap:wrap;gap:18px;
+  }
+  .assump div{font-size:13px;}
+  .assump b{display:block;font-size:18px;color:var(--ink);}
+  .assump span{color:var(--muted);}
+  h2{font-size:16px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:32px 0 14px;}
+
+  /* bar chart */
+  .chart{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px;}
+  .row{display:flex;align-items:center;gap:12px;margin:10px 0;}
+  .row .name{width:150px;font-size:13px;font-weight:600;flex-shrink:0;}
+  .track{flex:1;background:#f1f5f9;border-radius:8px;height:30px;position:relative;overflow:hidden;}
+  .fill{height:100%;border-radius:8px;display:flex;align-items:center;padding:0 10px;color:#fff;font-size:12px;font-weight:700;white-space:nowrap;}
+  .cost{width:120px;text-align:right;font-size:13px;font-weight:700;flex-shrink:0;}
+  .legend{font-size:11px;color:var(--muted);margin-top:10px;}
+
+  /* table */
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;font-size:13px;}
+  th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:#f8fafc;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);}
+  tr:last-child td{border-bottom:none;}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;}
+  .pill.good{background:#dcfce7;color:#166534;}
+  .pill.warn{background:#fef3c7;color:#92400e;}
+  .pill.bad{background:#fee2e2;color:#991b1b;}
+  .best{box-shadow:inset 3px 0 0 var(--green);}
+  .note{font-size:13px;color:var(--muted);}
+  .rec{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:16px;padding:18px 22px;margin-top:24px;}
+  .rec h3{margin:0 0 8px;color:#065f46;font-size:16px;}
+  .rec p{margin:6px 0;font-size:14px;color:#065f46;}
+  .foot{font-size:11px;color:var(--muted);margin-top:24px;text-align:center;}
+  code{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:12px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Khatape — Backend Cost Comparison</h1>
+  <p class="sub">Estimated monthly cost at this client's real scale. Figures are realistic upper-edge estimates (₹ at ~₹85/$).</p>
+
+  <div class="assump">
+    <div><b>2,400</b><span>customers (1,000 cards at start)</span></div>
+    <div><b>~500</b><span>purchases recorded / day</span></div>
+    <div><b>~250–450 MB</b><span>database growth / year</span></div>
+    <div><b>1</b><span>shared project serves ALL shops (multi-tenant)</span></div>
+  </div>
+
+  <h2>Estimated monthly cost</h2>
+  <div class="chart">
+    <div class="row">
+      <div class="name">Self-host VPS<br><span style="font-weight:400;color:var(--muted);font-size:11px">Postgres/Supabase</span></div>
+      <div class="track"><div class="fill" style="width:14%;background:var(--green)">₹400–600</div></div>
+      <div class="cost">₹400–600</div>
+    </div>
+    <div class="row">
+      <div class="name">Supabase Free</div>
+      <div class="track"><div class="fill" style="width:4%;background:#94a3b8">₹0*</div></div>
+      <div class="cost">₹0*</div>
+    </div>
+    <div class="row">
+      <div class="name">Supabase Pro</div>
+      <div class="track"><div class="fill" style="width:48%;background:var(--accent)">₹2,100 flat</div></div>
+      <div class="cost">~₹2,100</div>
+    </div>
+    <div class="row">
+      <div class="name">Firebase (Blaze)</div>
+      <div class="track"><div class="fill" style="width:62%;background:var(--amber)">₹800–3,000+ (variable)</div></div>
+      <div class="cost">variable</div>
+    </div>
+    <div class="row">
+      <div class="name">Neon + Auth</div>
+      <div class="track"><div class="fill" style="width:42%;background:#6366f1">₹0–1,600</div></div>
+      <div class="cost">₹0–1,600</div>
+    </div>
+    <p class="legend">* Free tier pauses after ~7 days idle, 500&nbsp;MB cap (fills in ~1 year at this scale), no daily backups — fine for testing, not for a serious client.</p>
+  </div>
+
+  <h2>Side by side</h2>
+  <table>
+    <thead>
+      <tr><th>Option</th><th>Billing model</th><th>Est. / month</th><th>Fit for Khatape</th><th>Lock-in</th></tr>
+    </thead>
+    <tbody>
+      <tr class="best">
+        <td><b>Supabase Pro</b><br><span class="note">Managed Postgres</span></td>
+        <td>Flat plan (not per read/write). 8&nbsp;GB DB, 250&nbsp;GB egress, 100k auth users, 2M edge calls.</td>
+        <td><b>~₹2,100</b><br><span class="note">flat for years</span></td>
+        <td><span class="pill good">Best fit</span><br><span class="note">SQL ledger/FIFO, real RLS, Auth+Edge built in, predictable price</span></td>
+        <td><span class="pill good">None</span><br><span class="note">it's plain Postgres</span></td>
+      </tr>
+      <tr>
+        <td><b>Self-host</b><br><span class="note">Supabase/Postgres on a VPS</span></td>
+        <td>Fixed VPS rent (Hetzner/DigitalOcean). Tiny box handles this load easily.</td>
+        <td><b>₹400–600</b></td>
+        <td><span class="pill good">Cheapest</span><br><span class="note">same features; you run updates &amp; backups</span></td>
+        <td><span class="pill good">None</span></td>
+      </tr>
+      <tr>
+        <td><b>Firebase</b><br><span class="note">Firestore (Blaze)</span></td>
+        <td><b>Per operation</b> — billed per read/write/delete + storage + egress.</td>
+        <td><b>₹800–3,000+</b><br><span class="note">unpredictable, grows with reads</span></td>
+        <td><span class="pill bad">Poor</span><br><span class="note">NoSQL → painful ledger/FIFO/reporting; cost climbs with dashboard/list reads; original app had no security rules</span></td>
+        <td><span class="pill bad">High</span><br><span class="note">proprietary</span></td>
+      </tr>
+      <tr>
+        <td><b>Neon + Auth</b><br><span class="note">Serverless Postgres</span></td>
+        <td>Free tier (0.5&nbsp;GB), then ~₹1,600/mo. Auth added separately.</td>
+        <td><b>₹0–1,600</b></td>
+        <td><span class="pill warn">OK</span><br><span class="note">great DB, but you assemble Auth/RLS/APIs yourself</span></td>
+        <td><span class="pill good">Low</span></td>
+      </tr>
+      <tr>
+        <td><b>Supabase Free</b></td>
+        <td>Free, capped.</td>
+        <td><b>₹0</b></td>
+        <td><span class="pill warn">Testing only</span><br><span class="note">pauses when idle, 500&nbsp;MB, no backups</span></td>
+        <td><span class="pill good">None</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="rec">
+    <h3>Recommendation</h3>
+    <p><b>One Supabase Pro project (~₹2,100/mo) covers your ENTIRE operation</b> — it's multi-tenant, so the same project serves every shop and all 2,400+ customers. That cost does <i>not</i> multiply per shop or per card.</p>
+    <p><b>If you want it cheaper</b> (your ~₹500/mo target): self-host Supabase/Postgres on a small VPS for <b>₹400–600/mo</b>. Same code, no lock-in (it's Postgres), you just manage backups/updates. Good move once you have a few paying shops.</p>
+    <p><b>Avoid Firebase</b> here: per-operation billing is unpredictable at this read volume and NoSQL fights the ledger/invoice/FIFO logic Khatape is built on.</p>
+  </div>
+
+  <p class="foot">Estimates for planning only — actual costs depend on usage. Khatape's data is small (money/ledger rows), so cost is dominated by the flat plan, not transaction volume.</p>
+</div>
+</body>
+</html>
