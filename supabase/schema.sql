@@ -224,10 +224,14 @@ create policy tenants_write on tenants for all
 drop policy if exists app_users_read on app_users;
 create policy app_users_read on app_users for select
   using (is_super_admin() or id = auth.uid() or tenant_id = current_tenant_id());
+-- WRITE: super_admin ONLY. A tenant member must never write app_users, or they
+-- could update their own row to role='super_admin' and escalate to cross-tenant
+-- access. The signup trigger (security definer) and the manage-tenant-users Edge
+-- Function (service role) bypass RLS, so legitimate creation still works.
 drop policy if exists app_users_write on app_users;
 create policy app_users_write on app_users for all
-  using (is_super_admin() or tenant_id = current_tenant_id())
-  with check (is_super_admin() or tenant_id = current_tenant_id());
+  using (is_super_admin())
+  with check (is_super_admin());
 
 -- tenant_modules: only super_admin manages; tenant reads its own
 drop policy if exists tenant_modules_read on tenant_modules;

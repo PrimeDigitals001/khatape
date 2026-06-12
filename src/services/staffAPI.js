@@ -71,10 +71,11 @@ export const staffAPI = {
     return { success: true, data: mapItem(data) };
   },
 
-  // Search items by name
+  // Search items by name. Strip PostgREST filter metacharacters (, ( ) *) from the
+  // user input so it can't be used to inject extra .or() conditions.
   async searchItems(query) {
     const tenantId = await getActiveTenantId();
-    const ql = (query || "").trim();
+    const ql = (query || "").trim().replace(/[,()*]/g, "");
     let req = supabase.from("items").select("*").eq("tenant_id", tenantId);
     if (ql) req = req.or(`name.ilike.%${ql}%,capacity.ilike.%${ql}%`);
     const { data, error } = await req;
