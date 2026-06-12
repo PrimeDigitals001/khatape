@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { staffAPI } from "../services/staffAPI";
 import { whatsappService } from "../services/whatsappService";
 import thermalPrinterService from "../services/thermalPrinterService";
+import { isModuleOn } from "../services/session";
 import { computeLineTotal, quantityForAmount } from "../lib/pricing";
 import { rupeesToPaise, paiseToRupees } from "../lib/money";
 import { unitFamily, LOOSE_UNITS } from "../lib/units";
@@ -40,6 +41,9 @@ export default function PointOfSale() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [lastTransaction, setLastTransaction] = useState(null);
 
+  // Thermal printing is gated by the 'thermal_print' module for this shop.
+  const [thermalOn, setThermalOn] = useState(false);
+
   // Printer states
   const [printerConnected, setPrinterConnected] = useState(false);
   const [printerName, setPrinterName] = useState("");
@@ -71,7 +75,12 @@ export default function PointOfSale() {
   // Load items on mount
   useEffect(() => {
     loadItems();
-    checkPrinterConnection();
+    isModuleOn("thermal_print")
+      .then((on) => {
+        setThermalOn(on);
+        if (on) checkPrinterConnection();
+      })
+      .catch(() => setThermalOn(false));
   }, []);
 
   // Mobile detection
@@ -542,7 +551,7 @@ export default function PointOfSale() {
       setWhatsappSending(false);
   
       // Print receipt ONLY if printer is connected
-      if (printerConnected) {
+      if (thermalOn && printerConnected) {
         setTimeout(async () => {
           try {
             const printResult = await thermalPrinterService.printPurchaseReceipt(mockTransaction);
@@ -1329,14 +1338,16 @@ export default function PointOfSale() {
 
   return (
     <div className="h-full bg-slate-50 flex flex-col">
-      {/* Printer Status Bar - Always visible at top */}
-      <PrinterStatusBar
-        connected={printerConnected}
-        printerName={printerName}
-        onConnect={handleConnectPrinter}
-        onDisconnect={handleDisconnectPrinter}
-        connecting={connectingPrinter}
-      />
+      {/* Printer Status Bar - only when the thermal_print module is enabled */}
+      {thermalOn && (
+        <PrinterStatusBar
+          connected={printerConnected}
+          printerName={printerName}
+          onConnect={handleConnectPrinter}
+          onDisconnect={handleDisconnectPrinter}
+          connecting={connectingPrinter}
+        />
+      )}
 
       {/* Error Message */}
       <ErrorMessage message={error} onClose={() => setError(null)} />

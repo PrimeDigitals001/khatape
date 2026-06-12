@@ -10,20 +10,20 @@
 // app for a shop (and its customers) that wasn't opted in.
 
 export const MODULES = {
-  // --- core: always on ---
+  // --- core: always on for every shop ---
   pos: { name: "Point of Sale", core: true },
   customers: { name: "Customers", core: true },
   products: { name: "Products", core: true },
   ledger: { name: "Khaata Ledger", core: true },
   invoicing: { name: "Invoicing", core: true },
+  loose_items: { name: "Loose / weighed items", core: true }, // default for all shops
+  whatsapp: { name: "WhatsApp delivery", core: true },        // default (prefilled-message shortcut)
 
   // --- optional: super-admin grants per tenant ---
-  loose_items: { name: "Loose / weighed items", core: false },
   standing_orders: { name: "Daily standing orders", core: false },
   prepaid_wallet: { name: "Prepaid wallet", core: false },
   bulk_invoice: { name: "Bulk invoicing", core: false },
   bulk_import: { name: "Bulk customer import", core: false },
-  whatsapp: { name: "WhatsApp delivery", core: false },
   thermal_print: { name: "Thermal receipt printing", core: false },
   gst: { name: "GST billing", core: false },
   analytics: { name: "Analytics", core: false },

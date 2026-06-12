@@ -16,13 +16,13 @@ describe("modules — per-tenant entitlements (super-admin controlled)", () => {
   });
 
   it("optional modules are OFF by default", () => {
-    expect(isModuleEnabled({}, "loose_items")).toBe(false);
+    expect(isModuleEnabled({}, "standing_orders")).toBe(false);
     expect(isModuleEnabled({}, "gst")).toBe(false);
   });
 
   it("super-admin grants an optional module to one tenant only", () => {
-    const tenant = grantModule({}, "loose_items");
-    expect(isModuleEnabled(tenant, "loose_items")).toBe(true);
+    const tenant = grantModule({}, "standing_orders");
+    expect(isModuleEnabled(tenant, "standing_orders")).toBe(true);
     expect(isModuleEnabled(tenant, "gst")).toBe(false); // others stay off
   });
 
@@ -37,20 +37,23 @@ describe("modules — per-tenant entitlements (super-admin controlled)", () => {
 
   it("a FUTURE module stays disabled for existing tenants until explicitly granted", () => {
     // A tenant whose entitlements were saved before a new module shipped.
-    const existingTenant = { loose_items: true };
+    const existingTenant = { standing_orders: true };
     expect(isModuleEnabled(existingTenant, "analytics")).toBe(false);
     expect(isModuleEnabled(existingTenant, "some_unreleased_feature")).toBe(false);
   });
 
   it("reports the enabled set (core + granted) per tenant", () => {
-    const tenant = grantModule(grantModule({}, "loose_items"), "whatsapp");
+    const tenant = grantModule(grantModule({}, "standing_orders"), "bulk_import");
     const enabled = enabledModules(tenant);
     expect(enabled).toContain("pos"); // core
-    expect(enabled).toContain("loose_items");
-    expect(enabled).toContain("whatsapp");
+    expect(enabled).toContain("loose_items"); // now core (default)
+    expect(enabled).toContain("whatsapp"); // now core (default)
+    expect(enabled).toContain("standing_orders"); // granted optional
+    expect(enabled).toContain("bulk_import"); // granted optional
     expect(enabled).not.toContain("gst");
     expect(optionalModules()).not.toContain("pos");
     expect(isCoreModule("pos")).toBe(true);
+    expect(isCoreModule("loose_items")).toBe(true);
     expect(isCoreModule("gst")).toBe(false);
   });
 
