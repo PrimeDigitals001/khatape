@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { FiPackage, FiUsers, FiX, FiHome, FiShoppingCart, FiTruck, FiZap, FiSettings, FiUpload } from "react-icons/fi";
+import { FiPackage, FiUsers, FiX, FiHome, FiShoppingCart, FiTruck, FiZap, FiSettings, FiUpload, FiFileText, FiBarChart2 } from "react-icons/fi";
 import { getActiveTenantName, getEnabledModules } from "../services/session";
 
 // `module` (optional) gates the item behind an enabled module key.
@@ -11,6 +11,8 @@ const navItems = [
   { to: "/admin/round", label: "Daily Round", icon: FiTruck, module: "standing_orders" },
   { to: "/admin/tap", label: "Tap & Go", icon: FiZap, module: "standing_orders" },
   { to: "/admin/customers", label: "Customers", icon: FiUsers },
+  { to: "/admin/bulk-invoice", label: "Bulk Invoicing", icon: FiFileText, module: "bulk_invoice" },
+  { to: "/admin/analytics", label: "Analytics", icon: FiBarChart2, module: "analytics" },
   { to: "/admin/import", label: "Import / Export", icon: FiUpload, module: "bulk_import" },
   { to: "/admin/settings", label: "Settings", icon: FiSettings },
 ];

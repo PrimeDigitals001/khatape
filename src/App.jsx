@@ -11,8 +11,12 @@ import DailyRound from "./pages/DailyRound";
 import TapAndGo from "./pages/TapAndGo";
 import Settings from "./pages/Settings";
 import BulkImport from "./pages/BulkImport";
+import BulkInvoice from "./pages/BulkInvoice";
+import Analytics from "./pages/Analytics";
+import CustomerView from "./pages/CustomerView";
 import InvoiceManagement from "./pages/InvoiceManagement";
 import AdminDashboard from "./pages/AdminDashboard";
+import ResetPassword from "./pages/ResetPassword";
 import { AuthProvider } from "./auth/AuthProvider";
 import { useAuth } from "./auth/AuthContext";
 import RequireAuth from "./auth/RequireAuth";
@@ -51,6 +55,10 @@ function App() {
         <Routes>
           <Route path="/" element={<RoleRedirect />} />
           <Route path="/login" element={<Login />} />
+          {/* Password reset (landing page for the email link) */}
+          <Route path="/reset-password" element={<ResetPassword />} />
+          {/* Public, no-login customer self-view */}
+          <Route path="/c/:token" element={<CustomerView />} />
 
           {/* Super-Admin (Operator Console) */}
           <Route
@@ -81,6 +89,8 @@ function App() {
             <Route path="tap" element={<TapAndGo />} />
             <Route path="settings" element={<Settings />} />
             <Route path="import" element={<BulkImport />} />
+            <Route path="bulk-invoice" element={<BulkInvoice />} />
+            <Route path="analytics" element={<Analytics />} />
             <Route
               path="customers/:customerId/invoice"
               element={<CustomerInvoice />}

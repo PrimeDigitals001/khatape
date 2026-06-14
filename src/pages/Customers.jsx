@@ -11,6 +11,7 @@ import {
 } from "@heroicons/react/outline";
 import { useNavigate } from "react-router-dom";
 import { adminAPI } from "../services/adminAPI";
+import { isModuleOn } from "../services/session";
 
 export default function ManageCustomers() {
   const focusParams =
@@ -22,7 +23,10 @@ export default function ManageCustomers() {
 
 
   const [customers, setCustomers] = useState([]);
-  const [customerUnpaidAmounts, setCustomerUnpaidAmounts] = useState({}); // New state for unpaid amounts
+  const [customerUnpaidAmounts, setCustomerUnpaidAmounts] = useState({}); // outstanding (due > 0)
+  const [customerAdvance, setCustomerAdvance] = useState({}); // advance/credit (due < 0), prepaid_wallet
+  const [walletOn, setWalletOn] = useState(false);
+  const [selfViewOn, setSelfViewOn] = useState(false);
   const [search, setSearch] = useState("");
   const [showRfidModal, setShowRfidModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -92,6 +96,28 @@ export default function ManageCustomers() {
     loadCustomers();
   }, [currentPage]);
 
+  // Optional module flags for this shop.
+  useEffect(() => {
+    isModuleOn("prepaid_wallet").then(setWalletOn).catch(() => setWalletOn(false));
+    isModuleOn("customer_self_view").then(setSelfViewOn).catch(() => setSelfViewOn(false));
+  }, []);
+
+  // Copy a customer's private self-view link.
+  const shareSelfView = async (customer) => {
+    if (!customer.publicToken) {
+      setError("This customer has no link yet — re-run add_customer_token.sql.");
+      return;
+    }
+    const url = `${window.location.origin}/c/${customer.publicToken}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setSuccessMessage(`Self-view link copied for ${customer.name}`);
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch {
+      window.prompt("Copy this customer's link:", url);
+    }
+  };
+
   // Persist current page so back-navigation from invoice page restores it
   useEffect(() => {
     sessionStorage.setItem("customersCurrentPage", String(currentPage));
@@ -158,19 +184,25 @@ export default function ManageCustomers() {
     }
   };
 
-  // Live khaata dues for all customers (purchases - payments), one cheap call.
+  // Live khaata for all customers (invoiced - paid), one cheap call.
+  // due > 0 = outstanding; due < 0 = advance/credit (prepaid wallet).
   const loadCustomerUnpaidAmounts = async () => {
     try {
       const balances = await adminAPI.getTenantBalances();
       const unpaidAmounts = {};
+      const advances = {};
       Object.entries(balances).forEach(([cid, b]) => {
         unpaidAmounts[cid] = b.due > 0 ? b.due : 0;
+        advances[cid] = b.due < 0 ? -b.due : 0;
       });
       setCustomerUnpaidAmounts(unpaidAmounts);
+      setCustomerAdvance(advances);
     } catch (error) {
       console.error("Failed to load customer balances:", error);
     }
   };
+
+  const getCustomerAdvance = (customerId) => customerAdvance[customerId] || 0;
 
   // Helper function to get unpaid amount for a customer
   const getCustomerUnpaidAmount = (customerId) => {
@@ -804,6 +836,11 @@ export default function ManageCustomers() {
                               ₹{getCustomerUnpaidAmount(customer.id)} due
                             </span>
                           )}
+                          {walletOn && !hasUnpaidAmount(customer.id) && getCustomerAdvance(customer.id) > 0 && (
+                            <span className="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-full font-medium">
+                              ₹{getCustomerAdvance(customer.id)} advance
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-gray-600 mt-1">ID: {customer.customerId || customer.displayId || String(customer.id).padStart(4, "0")}</p>                        <p className="text-xs text-gray-600">{customer.phone}</p>
                       </div>
@@ -834,6 +871,14 @@ export default function ManageCustomers() {
                         >
                           Invoice
                         </button>
+                        {selfViewOn && (
+                          <button
+                            onClick={() => shareSelfView(customer)}
+                            className="bg-slate-600 hover:bg-slate-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-150"
+                          >
+                            Link
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className="flex justify-end gap-2">
@@ -898,6 +943,10 @@ export default function ManageCustomers() {
                               <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium">
                                 ₹{getCustomerUnpaidAmount(customer.id)}
                               </span>
+                            ) : walletOn && getCustomerAdvance(customer.id) > 0 ? (
+                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                                ₹{getCustomerAdvance(customer.id)} advance
+                              </span>
                             ) : (
                               <span className="text-gray-400 text-xs">-</span>
                             )}
@@ -948,6 +997,14 @@ export default function ManageCustomers() {
                               >
                                 View
                               </button>
+                              {selfViewOn && (
+                                <button
+                                  onClick={() => shareSelfView(customer)}
+                                  className="bg-slate-600 hover:bg-slate-700 text-white px-2.5 py-1 rounded text-xs font-medium transition-colors duration-150"
+                                >
+                                  Link
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1097,13 +1154,23 @@ export default function ManageCustomers() {
             className="bg-white rounded-2xl p-5 sm:p-6 w-full max-w-sm shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-black mb-1">Record Payment</h2>
-            <p className="text-sm text-gray-500 mb-4">
+            <h2 className="text-lg font-semibold text-black mb-1">
+              {walletOn ? "Record Payment / Top-up" : "Record Payment"}
+            </h2>
+            <p className="text-sm text-gray-500 mb-1">
               {payCustomer.name} ·{" "}
-              <span className={getCustomerUnpaidAmount(payCustomer.id) > 0 ? "text-red-600 font-medium" : "text-gray-500"}>
-                ₹{getCustomerUnpaidAmount(payCustomer.id)} due
-              </span>
+              {getCustomerUnpaidAmount(payCustomer.id) > 0 ? (
+                <span className="text-red-600 font-medium">₹{getCustomerUnpaidAmount(payCustomer.id)} due</span>
+              ) : walletOn && getCustomerAdvance(payCustomer.id) > 0 ? (
+                <span className="text-green-600 font-medium">₹{getCustomerAdvance(payCustomer.id)} advance</span>
+              ) : (
+                <span>no dues</span>
+              )}
             </p>
+            {walletOn && (
+              <p className="text-xs text-gray-400 mb-4">Paying more than the due adds to their advance balance.</p>
+            )}
+            {!walletOn && <div className="mb-3" />}
 
             {error && (
               <div className="mb-3 p-3 bg-red-100 border border-red-300 rounded-lg text-red-700 text-sm">

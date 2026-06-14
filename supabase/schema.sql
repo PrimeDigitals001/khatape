@@ -78,11 +78,13 @@ create table if not exists customers (
   rfid            text,
   customer_code   text,        -- per-tenant display id, e.g. "CD1"
   sequence_number int,         -- per-tenant running number
+  public_token    text default gen_random_uuid()::text,  -- self-view link token
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
   unique (tenant_id, rfid),
   unique (tenant_id, customer_code)
 );
+create unique index if not exists customers_public_token_idx on customers(public_token);
 create index if not exists customers_tenant_idx on customers(tenant_id);
 create index if not exists customers_rfid_idx on customers(tenant_id, rfid);
 

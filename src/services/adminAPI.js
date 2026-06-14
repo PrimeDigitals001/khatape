@@ -31,6 +31,7 @@ const mapCustomer = (row) => ({
   customerId: row.customer_code || row.id,
   displayId: row.customer_code || row.id,
   sequenceNumber: row.sequence_number,
+  publicToken: row.public_token,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -672,6 +673,145 @@ export const adminAPI = {
       status: "sent",
     };
     return { success: true, data: invoice, message: `Invoice prepared for ${invoiceData.customerName || "customer"}` };
+  },
+
+  // ===================== BULK INVOICING =====================
+  // Generate one invoice per customer for their purchases in [startDate, endDate].
+  // Idempotent: re-running the same period upserts (no duplicates).
+  async bulkGenerateInvoices(startDate, endDate) {
+    const tenantId = await getActiveTenantId();
+    const [txnRes, custRes] = await Promise.all([
+      supabase.from("transactions").select("customer_id, customer_name, total, items, date")
+        .eq("tenant_id", tenantId).gte("date", startDate).lte("date", endDate),
+      supabase.from("customers").select("id, name, customer_code, phone").eq("tenant_id", tenantId),
+    ]);
+    if (txnRes.error) throw txnRes.error;
+    if (custRes.error) throw custRes.error;
+    const custMap = {};
+    (custRes.data || []).forEach((c) => { custMap[c.id] = c; });
+
+    const byCust = {};
+    (txnRes.data || []).forEach((t) => {
+      if (!t.customer_id) return;
+      const g = (byCust[t.customer_id] = byCust[t.customer_id] || { total: 0, orders: [], name: t.customer_name });
+      g.total += Number(t.total || 0);
+      (t.items || []).forEach((it) =>
+        g.orders.push({
+          itemName: it.itemName || it.name || "Item",
+          quantity: it.quantity,
+          unitPrice: it.unitPrice ?? it.price,
+          total: it.total,
+          date: t.date,
+        })
+      );
+    });
+
+    const period = String(startDate).slice(0, 7).replace("-", ""); // YYYYMM
+    const rows = [];
+    Object.entries(byCust).forEach(([cid, g]) => {
+      if (g.total <= 0) return;
+      const c = custMap[cid];
+      const code = c?.customer_code || cid;
+      rows.push({
+        tenant_id: tenantId,
+        invoice_id: `BULK-${code}-${period}`,
+        customer_id: cid,
+        customer_name: c?.name || g.name || null,
+        customer_phone: c?.phone || null,
+        start_date: startDate,
+        end_date: endDate,
+        orders: g.orders,
+        total_amount: g.total,
+        payment_status: "unpaid",
+      });
+    });
+    if (rows.length) {
+      const { error } = await supabase.from("invoices").upsert(rows, { onConflict: "tenant_id,invoice_id" });
+      if (error) throw error;
+    }
+    // Return the per-customer invoices too, so the UI can hand each one out on
+    // WhatsApp (with its PDF). Browsers can't truly bulk-send, so the page walks
+    // through these one tap at a time.
+    const invoices = rows.map((r) => ({
+      invoiceId: r.invoice_id,
+      customerId: r.customer_id,
+      name: r.customer_name,
+      phone: r.customer_phone,
+      total: r.total_amount,
+      orders: r.orders,
+      startDate,
+      endDate,
+    }));
+    return {
+      success: true,
+      data: { count: rows.length, total: rows.reduce((s, r) => s + r.total_amount, 0), invoices },
+    };
+  },
+
+  // ===================== ANALYTICS =====================
+  async getAnalytics() {
+    const tenantId = await getActiveTenantId();
+    const [txnRes, custCount, itemCount, outstanding] = await Promise.all([
+      supabase.from("transactions").select("customer_id, customer_name, total, items, date").eq("tenant_id", tenantId),
+      supabase.from("customers").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+      supabase.from("items").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
+      this.getOutstandingTotal(),
+    ]);
+    if (txnRes.error) throw txnRes.error;
+    const txns = txnRes.data || [];
+
+    const totalSales = txns.reduce((s, t) => s + Number(t.total || 0), 0);
+
+    // top customers by total purchases
+    const custTotals = {};
+    txns.forEach((t) => {
+      if (!t.customer_id) return;
+      custTotals[t.customer_id] = custTotals[t.customer_id] || { name: t.customer_name || "—", total: 0, orders: 0 };
+      custTotals[t.customer_id].total += Number(t.total || 0);
+      custTotals[t.customer_id].orders += 1;
+    });
+    const topCustomers = Object.values(custTotals).sort((a, b) => b.total - a.total).slice(0, 8);
+
+    // top items by revenue + qty
+    const itemTotals = {};
+    txns.forEach((t) =>
+      (t.items || []).forEach((it) => {
+        const name = it.itemName || it.name || "Item";
+        itemTotals[name] = itemTotals[name] || { name, revenue: 0, qty: 0 };
+        itemTotals[name].revenue += Number(it.total || 0);
+        itemTotals[name].qty += Number(it.quantity || 0);
+      })
+    );
+    const topItems = Object.values(itemTotals).sort((a, b) => b.revenue - a.revenue).slice(0, 8);
+
+    // last 14 days sales series
+    const days = [];
+    const base = new Date();
+    base.setHours(0, 0, 0, 0);
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(base);
+      d.setDate(d.getDate() - i);
+      days.push({ date: d.toISOString().split("T")[0], total: 0 });
+    }
+    const dayIndex = {};
+    days.forEach((d, i) => { dayIndex[d.date] = i; });
+    txns.forEach((t) => {
+      if (t.date && dayIndex[t.date] !== undefined) days[dayIndex[t.date]].total += Number(t.total || 0);
+    });
+
+    return {
+      success: true,
+      data: {
+        totalSales,
+        orderCount: txns.length,
+        customerCount: custCount.count || 0,
+        itemCount: itemCount.count || 0,
+        outstanding: outstanding.data.total,
+        topCustomers,
+        topItems,
+        series: days,
+      },
+    };
   },
 
   // ===================== PAYMENTS + KHAATA (live, never-stored invoices) =====================
