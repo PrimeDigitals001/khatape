@@ -585,7 +585,7 @@ export default function ManageItems() {
                         <h3 className="font-semibold text-black text-sm truncate">
                           {item.name}
                         </h3>
-                        <p className="text-xs text-gray-600 mt-1">ID: {String(item.id).padStart(4, "0")}</p>
+                        <p className="text-xs text-gray-600 mt-1">{item.displayId || item.id}</p>
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-black text-sm">₹{item.price}{item.pricingMode === "loose" ? `/${item.rateUnit}` : ""}</p>
@@ -638,7 +638,7 @@ export default function ManageItems() {
                           }`}
                         >
                           <td className="text-center px-6 py-4 text-black w-32">
-                            {String(item.id).padStart(4, "0")}
+                            {item.displayId || item.id}
                           </td>
                           <td className="text-center px-6 py-4 text-black w-64 truncate">
                             {item.name}
@@ -684,7 +684,7 @@ export default function ManageItems() {
       <AnimatePresence>
         {showDeleteModal && deletingItem && (
           <motion.div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4"
+            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex justify-center items-center z-50 p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -752,7 +752,7 @@ export default function ManageItems() {
       <AnimatePresence>
         {showModal && (
           <motion.div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4"
+            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex justify-center items-center z-50 p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

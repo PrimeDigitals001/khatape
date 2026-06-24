@@ -1,13 +1,19 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  PencilIcon,
-  TrashIcon,
   PlusIcon,
   CreditCardIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ExclamationIcon,
+  DocumentTextIcon,
+  RefreshIcon,
+  BanIcon,
+  CheckCircleIcon,
+  LinkIcon,
+  PencilIcon,
+  TrashIcon,
+  DotsHorizontalIcon,
 } from "@heroicons/react/outline";
 import { useNavigate } from "react-router-dom";
 import { adminAPI } from "../services/adminAPI";
@@ -55,6 +61,15 @@ export default function ManageCustomers() {
   const [assignRfid, setAssignRfid] = useState("");
   const [assignErr, setAssignErr] = useState("");
   const [assignSaving, setAssignSaving] = useState(false);
+
+  // Replace-card modal (lost/stolen) + suspend toggle
+  const [showReplace, setShowReplace] = useState(false);
+  const [replaceCustomer, setReplaceCustomer] = useState(null);
+  const [replaceRfid, setReplaceRfid] = useState("");
+  const [replaceErr, setReplaceErr] = useState("");
+  const [replaceSaving, setReplaceSaving] = useState(false);
+  const [suspendingId, setSuspendingId] = useState(null);
+  const [actionsFor, setActionsFor] = useState(null); // customer whose "More" menu is open
 
   // Standing-order modal state (daily delivery round)
   const [showStandingModal, setShowStandingModal] = useState(false);
@@ -441,6 +456,48 @@ export default function ManageCustomers() {
       setAssignErr(e.message || "Failed to assign card");
     } finally {
       setAssignSaving(false);
+    }
+  };
+
+  // ---- Suspend / resume service (records are kept) ----
+  const toggleSuspend = async (customer) => {
+    try {
+      setSuspendingId(customer.id);
+      setError(null);
+      await adminAPI.setCustomerSuspended(customer.id, !customer.suspended);
+      setSuccessMessage(customer.suspended ? `${customer.name} resumed` : `${customer.name} suspended`);
+      await loadCustomers();
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (e) {
+      setError(e.message || "Failed to update customer");
+    } finally {
+      setSuspendingId(null);
+    }
+  };
+
+  // ---- Replace a lost/stolen card (block old, attach new) ----
+  const openReplace = (customer) => {
+    setReplaceCustomer(customer);
+    setReplaceRfid("");
+    setReplaceErr("");
+    setShowReplace(true);
+  };
+  const closeReplace = () => { setShowReplace(false); setReplaceCustomer(null); };
+  const submitReplace = async () => {
+    const rfid = replaceRfid.trim();
+    if (!rfid) { setReplaceErr("Tap the new card"); return; }
+    try {
+      setReplaceSaving(true);
+      setReplaceErr("");
+      await adminAPI.replaceCard(replaceCustomer.id, rfid);
+      setSuccessMessage(`New card linked to ${replaceCustomer.name}; old card blocked.`);
+      closeReplace();
+      await loadCustomers();
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (e) {
+      setReplaceErr(e.message || "Failed to replace card");
+    } finally {
+      setReplaceSaving(false);
     }
   };
 
@@ -842,60 +899,26 @@ export default function ManageCustomers() {
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-600 mt-1">ID: {customer.customerId || customer.displayId || String(customer.id).padStart(4, "0")}</p>                        <p className="text-xs text-gray-600">{customer.phone}</p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          ID: {customer.customerId || customer.displayId || String(customer.id).padStart(4, "0")}
+                          {customer.suspended && <span className="ml-2 text-[10px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">Suspended</span>}
+                        </p>
+                        <p className="text-xs text-gray-600">{customer.phone}</p>
                       </div>
-                      <div className="flex gap-1.5 flex-wrap justify-end">
-                        {!customer.rfid && (
-                          <button
-                            onClick={() => openAssign(customer)}
-                            className="bg-indigo-500 hover:bg-indigo-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-150"
-                          >
-                            + Card
-                          </button>
-                        )}
+                      <div className="flex gap-1.5 justify-end">
                         <button
                           onClick={() => openPayModal(customer)}
-                          className="bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-150"
+                          className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors duration-150"
                         >
                           Pay
                         </button>
                         <button
-                          onClick={() => openStandingModal(customer)}
-                          className="bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-150"
+                          onClick={() => setActionsFor(customer)}
+                          className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1 rounded text-xs font-medium transition-colors duration-150 inline-flex items-center gap-1"
                         >
-                          Standing
+                          <DotsHorizontalIcon className="h-4 w-4" /> More
                         </button>
-                        <button
-                          onClick={() => handleInvoiceClick(customer)}
-                          className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-150"
-                        >
-                          Invoice
-                        </button>
-                        {selfViewOn && (
-                          <button
-                            onClick={() => shareSelfView(customer)}
-                            className="bg-slate-600 hover:bg-slate-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors duration-150"
-                          >
-                            Link
-                          </button>
-                        )}
                       </div>
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => openEditCustomer(customer)}
-                        disabled={modalLoading}
-                        className="p-2 rounded-lg bg-red-100 hover:bg-red-200 transition-colors duration-150 disabled:opacity-50"
-                      >
-                        <PencilIcon className="h-4 w-4 text-red-600" />
-                      </button>
-                      <button
-                        onClick={() => openDeleteConfirmation(customer)}
-                        disabled={deleteLoading}
-                        className="p-2 rounded-lg bg-red-100 hover:bg-red-200 transition-colors duration-150 disabled:opacity-50"
-                      >
-                        <TrashIcon className="h-4 w-4 text-red-600" />
-                      </button>
                     </div>
                   </div>
                 ))}
@@ -911,9 +934,7 @@ export default function ManageCustomers() {
                         <th className="text-center px-6 py-3 w-64">Name</th>
                         <th className="text-center px-6 py-3 w-40">Phone Number</th>
                         <th className="text-center px-6 py-3 w-32">Outstanding</th>
-                        <th className="text-center px-6 py-3 w-20">Edit</th>
-                        <th className="text-center px-6 py-3 w-20">Delete</th>
-                        <th className="text-center px-6 py-3 w-24">Invoice</th>
+                        <th className="text-center px-6 py-3 w-32">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -951,60 +972,20 @@ export default function ManageCustomers() {
                               <span className="text-gray-400 text-xs">-</span>
                             )}
                           </td>
-                          <td className="text-center px-6 py-4 w-20">
-                            <button
-                              onClick={() => openEditCustomer(customer)}
-                              disabled={modalLoading}
-                              className="p-1 rounded hover:bg-gray-200 transition-colors duration-150 disabled:opacity-50"
-                            >
-                              <PencilIcon className="h-5 w-5 text-gray-700 hover:text-red-600" />
-                            </button>
-                          </td>
-                          <td className="text-center px-6 py-4 w-20">
-                            <button
-                              onClick={() => openDeleteConfirmation(customer)}
-                              disabled={deleteLoading}
-                              className="p-1 rounded hover:bg-gray-200 transition-colors duration-150 disabled:opacity-50"
-                            >
-                              <TrashIcon className="h-5 w-5 text-gray-700 hover:text-red-600" />
-                            </button>
-                          </td>
                           <td className="text-center px-6 py-4 w-36">
-                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                              {!customer.rfid && (
-                                <button
-                                  onClick={() => openAssign(customer)}
-                                  className="bg-indigo-500 hover:bg-indigo-600 text-white px-2.5 py-1 rounded text-xs font-medium transition-colors duration-150"
-                                >
-                                  + Card
-                                </button>
-                              )}
+                            <div className="flex items-center justify-center gap-1.5">
                               <button
                                 onClick={() => openPayModal(customer)}
-                                className="bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1 rounded text-xs font-medium transition-colors duration-150"
+                                className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors duration-150"
                               >
                                 Pay
                               </button>
                               <button
-                                onClick={() => openStandingModal(customer)}
-                                className="bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1 rounded text-xs font-medium transition-colors duration-150"
+                                onClick={() => setActionsFor(customer)}
+                                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1 rounded text-xs font-medium transition-colors duration-150 inline-flex items-center gap-1"
                               >
-                                Standing
+                                <DotsHorizontalIcon className="h-4 w-4" /> More
                               </button>
-                              <button
-                                onClick={() => handleInvoiceClick(customer)}
-                                className="bg-green-500 hover:bg-green-600 text-white px-2.5 py-1 rounded text-xs font-medium transition-colors duration-150"
-                              >
-                                View
-                              </button>
-                              {selfViewOn && (
-                                <button
-                                  onClick={() => shareSelfView(customer)}
-                                  className="bg-slate-600 hover:bg-slate-700 text-white px-2.5 py-1 rounded text-xs font-medium transition-colors duration-150"
-                                >
-                                  Link
-                                </button>
-                              )}
                             </div>
                           </td>
                         </tr>
@@ -1020,7 +1001,7 @@ export default function ManageCustomers() {
 
       {/* Assign Card (RFID) Modal */}
       {showAssign && assignCustomer && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={closeAssign}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={closeAssign}>
           <div className="bg-white rounded-2xl p-5 sm:p-6 w-full max-w-sm shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-black mb-1">Assign Card</h2>
             <p className="text-sm text-gray-500 mb-4">Tap the RFID card to link it to {assignCustomer.name}.</p>
@@ -1047,10 +1028,90 @@ export default function ManageCustomers() {
         </div>
       )}
 
+      {/* Actions menu ("More") — keeps each row uncluttered */}
+      {actionsFor && (
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-4" onClick={() => setActionsFor(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-xs shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b border-gray-100">
+              <p className="font-semibold text-black truncate">{actionsFor.name}</p>
+              <p className="text-xs text-gray-500">
+                {actionsFor.customerId || actionsFor.displayId}{actionsFor.suspended ? " · Suspended" : ""}
+              </p>
+            </div>
+            <div className="py-1">
+              {[
+                { label: "View invoice", Icon: DocumentTextIcon, color: "text-blue-600", bg: "bg-blue-50", on: () => handleInvoiceClick(actionsFor) },
+                { label: "Standing order", Icon: RefreshIcon, color: "text-amber-600", bg: "bg-amber-50", on: () => openStandingModal(actionsFor) },
+                !actionsFor.rfid && { label: "Assign card", Icon: CreditCardIcon, color: "text-indigo-600", bg: "bg-indigo-50", on: () => openAssign(actionsFor) },
+                actionsFor.rfid && { label: "Replace card", Icon: CreditCardIcon, color: "text-orange-600", bg: "bg-orange-50", on: () => openReplace(actionsFor) },
+                actionsFor.suspended
+                  ? { label: "Resume service", Icon: CheckCircleIcon, color: "text-green-600", bg: "bg-green-50", on: () => toggleSuspend(actionsFor) }
+                  : { label: "Suspend service", Icon: BanIcon, color: "text-gray-600", bg: "bg-gray-100", on: () => toggleSuspend(actionsFor) },
+                selfViewOn && { label: "Copy self-view link", Icon: LinkIcon, color: "text-slate-600", bg: "bg-slate-100", on: () => shareSelfView(actionsFor) },
+                { label: "Edit details", Icon: PencilIcon, color: "text-slate-700", bg: "bg-slate-100", on: () => openEditCustomer(actionsFor) },
+              ]
+                .filter(Boolean)
+                .map((a) => (
+                  <button
+                    key={a.label}
+                    onClick={() => { const fn = a.on; setActionsFor(null); fn(); }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    <span className={`h-7 w-7 rounded-lg flex items-center justify-center ${a.bg}`}>
+                      <a.Icon className={`h-4 w-4 ${a.color}`} />
+                    </span>
+                    {a.label}
+                  </button>
+                ))}
+              <button
+                onClick={() => { const c = actionsFor; setActionsFor(null); openDeleteConfirmation(c); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 border-t border-gray-100"
+              >
+                <span className="h-7 w-7 rounded-lg flex items-center justify-center bg-red-50">
+                  <TrashIcon className="h-4 w-4 text-red-600" />
+                </span>
+                Delete customer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Replace Card Modal (lost/stolen) */}
+      {showReplace && replaceCustomer && (
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={closeReplace}>
+          <div className="bg-white rounded-2xl p-5 sm:p-6 w-full max-w-sm shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-black mb-1">Replace Card</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Tap the new card for {replaceCustomer.name}. The old card{replaceCustomer.rfid ? ` (${replaceCustomer.rfid})` : ""} will be blocked and can't be used again.
+            </p>
+            {replaceErr && <div className="mb-3 p-3 bg-red-100 border border-red-300 rounded-lg text-red-700 text-sm">{replaceErr}</div>}
+            <form onSubmit={(e) => { e.preventDefault(); submitReplace(); }}>
+              <input
+                type="text"
+                autoFocus
+                value={replaceRfid}
+                onChange={(e) => setReplaceRfid(e.target.value)}
+                placeholder="Tap new card — number appears here"
+                className="w-full px-3 py-3 border border-gray-300 rounded-lg text-center font-mono focus:outline-none focus:ring-2 focus:ring-[#E54A4A]"
+              />
+              <div className="flex gap-3 mt-4">
+                <button type="button" onClick={closeReplace} disabled={replaceSaving} className="flex-1 bg-white border border-gray-300 text-gray-700 py-2.5 rounded-lg font-medium hover:bg-gray-50 disabled:opacity-50">
+                  Cancel
+                </button>
+                <button type="submit" disabled={replaceSaving || !replaceRfid.trim()} className="flex-1 bg-[#E54A4A] hover:bg-[#d63939] text-white py-2.5 rounded-lg font-semibold disabled:opacity-50">
+                  {replaceSaving ? "Saving…" : "Block old & link new"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Standing Order Modal (daily delivery round) */}
       {showStandingModal && standingCustomer && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4"
+          className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex justify-center items-center z-50 p-4"
           onClick={closeStandingModal}
         >
           <div
@@ -1147,7 +1208,7 @@ export default function ManageCustomers() {
       {/* Record Payment Modal */}
       {showPayModal && payCustomer && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4"
+          className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex justify-center items-center z-50 p-4"
           onClick={closePayModal}
         >
           <div
@@ -1256,7 +1317,7 @@ export default function ManageCustomers() {
       <AnimatePresence>
         {showDeleteModal && deletingCustomer && (
           <motion.div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4"
+            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex justify-center items-center z-50 p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1282,7 +1343,9 @@ export default function ManageCustomers() {
                   ?
                 </p>
                 <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">
-                  This action cannot be undone.
+                  This permanently deletes <span className="font-semibold">all their records</span> — purchases,
+                  invoices and payments. This cannot be undone. To stop service temporarily instead, use
+                  <span className="font-semibold"> Suspend</span>.
                 </p>
 
                 {error && (
@@ -1324,7 +1387,7 @@ export default function ManageCustomers() {
       <AnimatePresence>
         {showRfidModal && (
           <motion.div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4"
+            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex justify-center items-center z-50 p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -1403,7 +1466,7 @@ export default function ManageCustomers() {
       <AnimatePresence>
         {showDetailsModal && (
           <motion.div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4"
+            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex justify-center items-center z-50 p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

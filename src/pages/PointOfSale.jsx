@@ -43,6 +43,8 @@ export default function PointOfSale() {
 
   // Thermal printing is gated by the 'thermal_print' module for this shop.
   const [thermalOn, setThermalOn] = useState(false);
+  // Auto-open WhatsApp after a sale — off by default; shop turns it on in Settings.
+  const [waOnPurchase, setWaOnPurchase] = useState(false);
 
   // Printer states
   const [printerConnected, setPrinterConnected] = useState(false);
@@ -81,6 +83,9 @@ export default function PointOfSale() {
         if (on) checkPrinterConnection();
       })
       .catch(() => setThermalOn(false));
+    staffAPI.getShopSettings()
+      .then((r) => setWaOnPurchase(r.data.waOnPurchase))
+      .catch(() => setWaOnPurchase(false));
   }, []);
 
   // Mobile detection
@@ -473,6 +478,14 @@ export default function PointOfSale() {
     try {
       const response = await staffAPI.getCustomerByRfid(rfidValue.trim());
       const foundCustomer = response.data;
+      // Suspended customers are refused at the counter until the shop resumes them.
+      if (foundCustomer.suspended) {
+        setError(`${foundCustomer.name} is suspended — resume them from Customers to serve again.`);
+        setCustomer(null);
+        setIsScanning(true);
+        setShowNotRegistered(false);
+        return;
+      }
       setCustomer(foundCustomer);
       setIsScanning(false);
       setShowNotRegistered(false);
@@ -579,10 +592,13 @@ export default function PointOfSale() {
         setTimeout(() => setPrinterStatus(null), 3000);
       }
   
-      // Send WhatsApp
-      setTimeout(() => {
-        handleSendWhatsApp(mockTransaction, true);
-      }, 1000);
+      // Auto-open WhatsApp only if the shop turned it on (keeps the flow fast).
+      // The success screen always has a manual "Send WhatsApp Receipt" button.
+      if (waOnPurchase) {
+        setTimeout(() => {
+          handleSendWhatsApp(mockTransaction, true);
+        }, 1000);
+      }
   
     } catch (error) {
       console.error("Transaction failed:", error);
@@ -747,7 +763,7 @@ export default function PointOfSale() {
       {customer && (
         <div className="text-right">
           <div className="text-xs font-medium text-gray-800 truncate max-w-[120px]">{customer.name}</div>
-          <div className="text-xs text-gray-500">Customer</div>
+          <div className="text-xs text-gray-500">{customer.customerId || "Customer"}</div>
         </div>
       )}
     </div>
@@ -770,7 +786,7 @@ export default function PointOfSale() {
 
   const CustomItemModal = ({ visible, onClose }) =>
     visible ? (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-xl p-6 max-w-sm w-full">
           <h3 className="text-lg font-semibold text-black mb-4">Add Manual Item</h3>
           <form onSubmit={handleCustomItemSubmit}>
@@ -830,7 +846,7 @@ export default function PointOfSale() {
     }
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-xl p-6 max-w-sm w-full">
           <h3 className="text-lg font-semibold text-black mb-1">{looseItem.name}</h3>
           <p className="text-xs text-gray-500 mb-4">₹{looseItem.price} per {looseItem.rateUnit} · loose</p>
@@ -1162,6 +1178,19 @@ export default function PointOfSale() {
 
   const CheckoutPanel = ({ cart, onClear, onUpdateQuantity, subtotal, onCheckout, busy, isMobile = false }) => (
     <div className={`h-full flex flex-col ${isMobile ? 'px-3 pb-3' : ''}`}>
+      {customer && (
+        <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 flex items-center justify-between flex-shrink-0">
+          <div className="min-w-0">
+            <div className="text-base font-bold text-slate-900 truncate">{customer.name}</div>
+            <div className="text-xs text-slate-500 truncate">
+              {customer.customerId || customer.id}{customer.phone ? ` · ${customer.phone}` : ""}
+            </div>
+          </div>
+          <span className="ml-2 shrink-0 text-[10px] font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">
+            ✓ Verified
+          </span>
+        </div>
+      )}
       <div className="flex justify-between items-center mb-4 flex-shrink-0">
         <h3 className={`font-semibold text-black ${isMobile ? 'text-base' : 'text-lg'}`}>
           {cart.length} {cart.length === 1 ? "item" : "items"} in cart
@@ -1246,7 +1275,7 @@ export default function PointOfSale() {
 
   const SuccessModal = ({ visible, transaction, busy, onClose, onNewCustomer }) =>
     visible && transaction ? (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-xl p-6 max-w-md w-full">
           <div className="text-center mb-4">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">

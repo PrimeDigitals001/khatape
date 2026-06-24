@@ -270,7 +270,7 @@ export default function SuperAdmin() {
 
       {/* Tenant logins modal */}
       {loginsTenant && (
-        <div className="fixed inset-0 bg-black/50 flex justify-center items-center z-50 p-4" onClick={closeLogins}>
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex justify-center items-center z-50 p-4" onClick={closeLogins}>
           <div className="bg-white rounded-2xl p-5 sm:p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-lg font-semibold text-slate-900 mb-1">Logins · {loginsTenant.name}</h2>
             <p className="text-xs text-slate-500 mb-4">

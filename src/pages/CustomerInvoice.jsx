@@ -33,7 +33,7 @@ export default function CustomerInvoice() {
       console.log('🚀 Generating invoice manually for WhatsApp...');
 
       // Generate invoice ID
-      const invoiceId = generateCustomInvoiceId(customer.id, startDate, endDate);
+      const invoiceId = generateCustomInvoiceId(customer.customerId || customer.id, startDate, endDate);
 
       // Create invoice data
       // IMPORTANT: Use invoiceId as the id field since the DB keys invoices by invoiceId
@@ -1124,254 +1124,40 @@ export default function CustomerInvoice() {
     .reduce((sum, invoice) => sum + (invoice.remainingAmount || 0), 0);
 
   // PDF Export function
-  const exportToPDF = () => {
+  // Download a polished, tenant-aware invoice PDF (shop name + UPI from the
+  // tenant profile; customer shown by their display code, e.g. CH1).
+  const exportToPDF = async () => {
     if (selectedOrders.length === 0) return;
-    Promise.all([
-      import("jspdf"),
-      import("jspdf-autotable"),
-      import("qrcode")
-    ])
-      .then(([{ default: jsPDF }, autoTableModule, QRCode]) => {
-        const doc = new jsPDF({ unit: "pt", format: "a4" });
-        const autoTable = autoTableModule?.default || autoTableModule?.autoTable;
-        const margin = 50;
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        const contentWidth = pageWidth - margin * 2;
-
-        // Fixed currency function
-        const currency = (n) => `Rs ${Number(n || 0).toFixed(2)}`;
-
-        // UPI Configuration
-        const UPI_CONFIG = {
-          upiId: "9714290103-3@okbizaxis",
-          merchantName: "Amul Store",
-          merchantCode: "1234",
-        };
-
-        // Generate UPI payment URL
-        const generateUPIUrl = (amount, transactionNote) => {
-          const upiParams = new URLSearchParams({
-            pa: UPI_CONFIG.upiId,
-            pn: UPI_CONFIG.merchantName,
-            am: amount.toFixed(2),
-            cu: "INR",
-            tn: transactionNote,
-          });
-          return `upi://pay?${upiParams.toString()}`;
-        };
-
-        // Generate QR Code
-        const generateQRCode = async (amount, invoiceId) => {
-          try {
-            const transactionNote = `Invoice ${invoiceId} `;
-            const upiUrl = generateUPIUrl(amount, transactionNote);
-
-            const qrCodeDataURL = await QRCode.toDataURL(upiUrl, {
-              width: 120,
-              margin: 1,
-              color: {
-                dark: '#000000',
-                light: '#FFFFFF'
-              }
-            });
-
-            return qrCodeDataURL;
-          } catch (error) {
-            // console.error('Error generating QR code:', error);
-            return null;
-          }
-        };
-
-        // All your existing PDF generation code here...
-        // (keeping it the same but removing WhatsApp parts)
-
-        const drawHeader = () => {
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(18);
-          doc.text("Chamunda Dairy", pageWidth / 2, margin, { align: "center" });
-
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(11);
-          doc.text(`${customer?.name || ""}`, pageWidth / 2, margin + 18, {
-            align: "center",
-          });
-          doc.text(
-            `Date Range: ${startDate} to ${endDate}`,
-            pageWidth / 2,
-            margin + 34,
-            { align: "center" }
-          );
-
-          // Customer + Summary boxes
-          const boxTop = margin + 52;
-          const boxHeight = 70;
-
-          // Customer box
-          doc.setDrawColor(220);
-          doc.setLineWidth(1);
-          doc.roundedRect(margin, boxTop, contentWidth / 2 - 8, boxHeight, 6, 6);
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(12);
-          doc.text("Customer Details", margin + 10, boxTop + 18);
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(11);
-          doc.text(`Name: ${customer?.name || ""}`, margin + 10, boxTop + 36);
-          doc.text(`Phone: ${customer?.phone || ""}`, margin + 10, boxTop + 52);
-          doc.text(`Customer ID: ${String(customer?.id || "").padStart(4, "0")}`, margin + 10, boxTop + 68);
-
-          // Summary box
-          const rightBoxX = margin + contentWidth / 2 + 8;
-          doc.roundedRect(rightBoxX, boxTop, contentWidth / 2 - 8, boxHeight, 6, 6);
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(12);
-          doc.text("Invoice Summary", rightBoxX + 10, boxTop + 18);
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(11);
-          doc.text(`Total Orders: ${selectedOrders.length}`, rightBoxX + 10, boxTop + 36);
-          doc.text(`Total Amount: ${currency(selectedTotalAmount)}`, rightBoxX + 10, boxTop + 52);
-          doc.text(`Generated: ${new Date().toLocaleString()}`, rightBoxX + 10, boxTop + 68);
-        };
-
-        const drawFooter = (pageNum, totalPages) => {
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(9);
-          doc.setTextColor(120);
-          doc.text(`Page ${pageNum} of ${totalPages}`, pageWidth / 2, pageHeight - 16, { align: "center" });
-          doc.text("Generated by Amul Store POS System", pageWidth / 2, pageHeight - 30, { align: "center" });
-          doc.setTextColor(0);
-        };
-
-        // Main PDF generation function
-        const generatePDF = async () => {
-          drawHeader();
-
-          // Build table rows
-          const rows = selectedOrders.map((order) => {
-            const unitPrice = typeof order.unitPrice === "string" ? parseFloat(order.unitPrice) : order.unitPrice;
-            const total = typeof order.total === "string" ? parseFloat(order.total) : order.total;
-            return [
-              String(order.itemName || ""),
-              String(order.date || ""),
-              String(order.quantity || 0),
-              currency(isNaN(unitPrice) ? 0 : unitPrice),
-              currency(isNaN(total) ? 0 : total),
-            ];
-          });
-
-          const startY = margin + 52 + 70 + 24;
-
-          if (!autoTable) {
-            throw new Error("jspdf-autotable not loaded correctly");
-          }
-
-          autoTable(doc, {
-            head: [["Item Name", "Date", "Qty", "Unit Price", "Total"]],
-            body: rows,
-            startY,
-            margin: { left: margin, right: margin },
-            styles: {
-              font: "helvetica",
-              fontSize: 10,
-              cellPadding: 6,
-              lineColor: 230,
-              lineWidth: 0.5,
-            },
-            headStyles: {
-              fillColor: [37, 99, 235],
-              textColor: 255,
-              halign: "center",
-              fontStyle: "bold",
-            },
-            alternateRowStyles: { fillColor: [248, 250, 252] },
-            columnStyles: {
-              0: { cellWidth: contentWidth - (90 + 40 + 90 + 90) },
-              1: { cellWidth: 90, halign: "center" },
-              2: { cellWidth: 40, halign: "center" },
-              3: { cellWidth: 90, halign: "right" },
-              4: { cellWidth: 90, halign: "right" },
-            },
-            didDrawPage: (data) => {
-              // Only draw footer on additional pages, not header
-              drawFooter(data.pageNumber, doc.internal.getNumberOfPages());
-            },
-          });
-
-          const tableEndY = doc.lastAutoTable.finalY || startY;
-
-          // Payment section with QR code
-          const paymentSectionY = Math.min(tableEndY + 30, pageHeight - margin - 200);
-
-          // Left side - Totals
-          const totalLabel = "Grand Total:";
-          const totalValue = currency(selectedTotalAmount);
-
-          doc.setDrawColor(37, 99, 235);
-          doc.setLineWidth(2);
-          doc.roundedRect(margin, paymentSectionY, 250, 40, 6, 6);
-
-          doc.setFont("helvetica", "bold");
-          doc.setFontSize(14);
-          doc.setTextColor(37, 99, 235);
-          doc.text(totalLabel, margin + 10, paymentSectionY + 20);
-          doc.text(totalValue, margin + 240, paymentSectionY + 20, { align: "right" });
-          doc.setTextColor(0);
-
-          // Right side - UPI QR Code
-          const qrCodeX = margin + 300;
-          const qrCodeY = paymentSectionY - 20;
-
-          // Generate QR code
-          const invoiceId = `INV-${Date.now()}`;
-          const qrCodeDataURL = await generateQRCode(selectedTotalAmount, invoiceId);
-
-          if (qrCodeDataURL) {
-            doc.setDrawColor(0, 150, 0);
-            doc.setLineWidth(2);
-            doc.roundedRect(qrCodeX, qrCodeY, 140, 140, 6, 6);
-            doc.addImage(qrCodeDataURL, 'PNG', qrCodeX + 10, qrCodeY + 10, 120, 120);
-
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(10);
-            doc.setTextColor(0, 150, 0);
-            doc.text("Pay via UPI", qrCodeX + 70, qrCodeY + 155, { align: "center" });
-            doc.text("Scan QR Code", qrCodeX + 70, qrCodeY + 170, { align: "center" });
-            doc.setTextColor(0);
-          }
-
-          // Payment instructions
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(10);
-          doc.setTextColor(100);
-
-          const instructionsY = paymentSectionY + 70;
-          doc.text("Payment Instructions:", margin, instructionsY);
-          doc.text("1. Scan the QR code with any UPI app (PhonePe, GPay, Paytm, etc.)", margin, instructionsY + 15);
-          doc.text("2. Verify the amount and merchant name", margin, instructionsY + 30);
-          doc.text("3. Complete the payment", margin, instructionsY + 45);
-          doc.text(`4. UPI ID: ${UPI_CONFIG.upiId}`, margin, instructionsY + 60);
-          doc.setTextColor(0);
-
-          // Generate filename and save (ONLY PDF DOWNLOAD)
-          const customerName = customer?.name?.replace(/[^a-zA-Z0-9]/g, '_') || "Customer";
-          const fileName = `Invoice_${customerName}_${startDate}_to_${endDate}.pdf`;
-          doc.save(fileName);
-
-          // Show simple success message
-          setSuccessMessage("PDF downloaded successfully!");
-          setTimeout(() => setSuccessMessage(""), 3000);
-        };
-
-        // Execute PDF generation
-        generatePDF().catch((error) => {
-          // console.error("Error in PDF generation:", error);
-          setError("PDF generation failed. Please try again.");
-        });
-      })
-      .catch((error) => {
-        // console.error("Error loading dependencies:", error);
-        setError("PDF generation failed. Please try again.");
+    try {
+      const { buildInvoicePdf, downloadBlob } = await import("../services/invoicePdf");
+      let shop = {};
+      try {
+        const res = await adminAPI.getTenantProfile();
+        shop = { name: res.data.name, phone: res.data.phone, upiId: res.data.upiId, gstNumber: res.data.gstNumber };
+      } catch {
+        /* fall back to a bare invoice if the profile can't be read */
+      }
+      const invoiceId = generateCustomInvoiceId(customer.customerId || customer.id, startDate, endDate);
+      const blob = await buildInvoicePdf({
+        shop,
+        customer: {
+          name: customer?.name,
+          phone: customer?.phone,
+          code: customer?.customerId || customer?.displayId,
+        },
+        orders: selectedOrders,
+        total: selectedTotalAmount,
+        invoiceId,
+        startDate,
+        endDate,
+        date: new Date().toLocaleDateString("en-IN"),
       });
+      downloadBlob(blob, `Invoice-${invoiceId}.pdf`);
+      setSuccessMessage("Invoice PDF downloaded.");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (e) {
+      setError("PDF generation failed. Please try again.");
+    }
   };
 
   if (loading) {
@@ -2013,7 +1799,7 @@ export default function CustomerInvoice() {
 
       {/* Edit Purchase Modal */}
       {showEditModal && selectedPurchase && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-auto max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-black">Edit Purchase</h3>
@@ -2126,7 +1912,7 @@ export default function CustomerInvoice() {
 
       {/* Payment Modal */}
       {showPaymentModal && selectedInvoice && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-auto max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-black">Add Payment</h3>
@@ -2252,7 +2038,7 @@ export default function CustomerInvoice() {
       {/* Custom Invoice Modal */}
       {/* Custom Invoice Modal */}
       {showInvoiceModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-auto max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-black">

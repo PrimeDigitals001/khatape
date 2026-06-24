@@ -4,7 +4,7 @@ import { supabase } from "../services/supabase";
 
 export default function Settings() {
   // Shop profile
-  const [profile, setProfile] = useState({ name: "", phone: "", upiId: "", gstNumber: "" });
+  const [profile, setProfile] = useState({ name: "", phone: "", upiId: "", gstNumber: "", waOnPurchase: false });
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState(null);
@@ -26,6 +26,7 @@ export default function Settings() {
           phone: res.data.phone || "",
           upiId: res.data.upiId || "",
           gstNumber: res.data.gstNumber || "",
+          waOnPurchase: res.data.waOnPurchase || false,
         });
       } catch (e) {
         setProfileErr(e.message || "Failed to load shop profile");
@@ -115,6 +116,23 @@ export default function Settings() {
                 <input className={input} value={profile.gstNumber} onChange={(e) => setProfile({ ...profile, gstNumber: e.target.value })} />
               </label>
               <p className="text-xs text-gray-400">Used on invoices (name, UPI for the payment QR, GST).</p>
+
+              <label className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 accent-[#E54A4A]"
+                  checked={profile.waOnPurchase}
+                  onChange={(e) => setProfile({ ...profile, waOnPurchase: e.target.checked })}
+                />
+                <span>
+                  <span className="block text-sm font-medium text-black">Open WhatsApp after each sale</span>
+                  <span className="block text-xs text-gray-500">
+                    Off keeps the counter fast — staff can still send a receipt from the success screen.
+                    Turn on to auto-open WhatsApp on every purchase.
+                  </span>
+                </span>
+              </label>
+
               <button type="submit" disabled={savingProfile} className="bg-[#E54A4A] hover:bg-[#d63939] text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50">
                 {savingProfile ? "Saving…" : "Save profile"}
               </button>

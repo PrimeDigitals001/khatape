@@ -10,6 +10,8 @@ const mapItem = (row) => ({
   pricingMode: row.pricing_mode || "packaged",
   rateUnit: row.rate_unit || "piece",
   image: row.image,
+  itemCode: row.item_code || null,
+  displayId: row.item_code || row.id,
 });
 
 // Map a DB customer row; the UI reads `customerId` (the per-tenant display code).
@@ -31,6 +33,15 @@ export const staffAPI = {
     if (error) throw error;
     if (!data) throw new Error("Customer not found");
     return { success: true, data: mapCustomer(data), message: "Customer found successfully" };
+  },
+
+  // Shop preferences the POS needs (e.g. auto-open WhatsApp after a sale).
+  async getShopSettings() {
+    const tenantId = await getActiveTenantId();
+    const { data, error } = await supabase
+      .from("tenants").select("wa_on_purchase").eq("id", tenantId).maybeSingle();
+    if (error) throw error;
+    return { success: true, data: { waOnPurchase: data?.wa_on_purchase || false } };
   },
 
   async getAllCustomers() {

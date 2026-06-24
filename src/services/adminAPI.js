@@ -18,6 +18,9 @@ const mapItem = (row) => ({
   pricingMode: row.pricing_mode || "packaged",
   rateUnit: row.rate_unit || "piece",
   image: row.image,
+  itemCode: row.item_code || null,
+  displayId: row.item_code || row.id,
+  sequenceNumber: row.sequence_number,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -31,6 +34,7 @@ const mapCustomer = (row) => ({
   customerId: row.customer_code || row.id,
   displayId: row.customer_code || row.id,
   sequenceNumber: row.sequence_number,
+  suspended: row.suspended || false,
   publicToken: row.public_token,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -120,6 +124,17 @@ export const adminAPI = {
     return { success: true, data: mapItem(data), message: "Item found successfully" };
   },
 
+  // Next per-tenant item code, e.g. "CH-I1" (same prefix as customer codes).
+  async _nextItemCode(tenantId) {
+    const { data: tenant } = await supabase.from("tenants").select("name").eq("id", tenantId).maybeSingle();
+    const prefix = generateClientPrefix(tenant?.name);
+    const { data: top } = await supabase
+      .from("items").select("sequence_number").eq("tenant_id", tenantId)
+      .order("sequence_number", { ascending: false }).limit(1).maybeSingle();
+    const nextSequence = (top?.sequence_number || 0) + 1;
+    return { nextSequence, code: `${prefix}-I${nextSequence}` };
+  },
+
   async createItem(itemData) {
     const tenantId = await getActiveTenantId();
     const pricingMode = itemData.pricingMode === "loose" ? "loose" : "packaged";
@@ -130,6 +145,7 @@ export const adminAPI = {
       throw new Error("Loose items need a unit (g, kg, ml or l)");
     }
     if (parseFloat(itemData.price) <= 0) throw new Error("Price must be greater than 0");
+    const { nextSequence, code } = await this._nextItemCode(tenantId);
     const payload = {
       tenant_id: tenantId,
       name: itemData.name.trim(),
@@ -138,6 +154,8 @@ export const adminAPI = {
       pricing_mode: pricingMode,
       rate_unit: rateUnit,
       image: itemData.image || null,
+      item_code: code,
+      sequence_number: nextSequence,
     };
     const { data, error } = await supabase.from("items").insert(payload).select().single();
     if (error) throw error;
@@ -227,6 +245,12 @@ export const adminAPI = {
     if (clash) {
       return { success: true, data: { isValid: false, message: `RFID already registered to ${clash.name || "another user"}` } };
     }
+    // Reject cards reported lost/stolen (blocked on replacement).
+    const { data: blocked } = await supabase
+      .from("blocked_cards").select("rfid").eq("tenant_id", tenantId).eq("rfid", String(rfid)).maybeSingle();
+    if (blocked) {
+      return { success: true, data: { isValid: false, message: "This card is blocked (reported lost/stolen)." } };
+    }
     return { success: true, data: { isValid: true, message: "RFID is available" } };
   },
 
@@ -287,11 +311,59 @@ export const adminAPI = {
     return { success: true, data: mapCustomer(data), message: "Customer updated successfully" };
   },
 
+  // Temporarily stop / resume service for a customer. Records are kept; a
+  // suspended customer is refused at the POS until resumed.
+  async setCustomerSuspended(id, suspended) {
+    const tenantId = await getActiveTenantId();
+    const { data, error } = await supabase
+      .from("customers")
+      .update({ suspended: !!suspended, updated_at: new Date().toISOString() })
+      .eq("tenant_id", tenantId).eq("id", String(id))
+      .select().single();
+    if (error) throw error;
+    return { success: true, data: mapCustomer(data), message: suspended ? "Customer suspended" : "Customer resumed" };
+  },
+
+  // Replace a lost/stolen card: block the old RFID (so it can't be tapped or
+  // re-registered) and attach a new card to the same customer.
+  async replaceCard(id, newRfid, reason = "lost/stolen") {
+    const tenantId = await getActiveTenantId();
+    const rfid = String(newRfid || "").trim();
+    if (!rfid) throw new Error("Enter the new card number");
+    const check = await this.validateRfid(rfid, id);
+    if (!check.data.isValid) throw new Error(check.data.message);
+    const { data: cust, error: cErr } = await supabase
+      .from("customers").select("rfid").eq("tenant_id", tenantId).eq("id", String(id)).maybeSingle();
+    if (cErr) throw cErr;
+    if (!cust) throw new Error("Customer not found");
+    const oldRfid = (cust.rfid || "").trim();
+    if (oldRfid && oldRfid !== rfid) {
+      const { error: bErr } = await supabase
+        .from("blocked_cards")
+        .upsert({ tenant_id: tenantId, rfid: oldRfid, customer_id: String(id), reason }, { onConflict: "tenant_id,rfid" });
+      if (bErr) throw bErr;
+    }
+    const { data, error } = await supabase
+      .from("customers")
+      .update({ rfid, updated_at: new Date().toISOString() })
+      .eq("tenant_id", tenantId).eq("id", String(id))
+      .select().single();
+    if (error) throw error;
+    return { success: true, data: mapCustomer(data), message: "Card replaced. Old card blocked." };
+  },
+
   async deleteCustomer(id) {
     const tenantId = await getActiveTenantId();
-    const { error } = await supabase.from("customers").delete().eq("tenant_id", tenantId).eq("id", String(id));
+    const cid = String(id);
+    // Records are text-keyed by the customer uuid (no FK cascade), so remove
+    // everything tied to this customer explicitly, then the customer row.
+    for (const tbl of ["payments", "invoices", "transactions", "standing_orders"]) {
+      const { error } = await supabase.from(tbl).delete().eq("tenant_id", tenantId).eq("customer_id", cid);
+      if (error) throw error;
+    }
+    const { error } = await supabase.from("customers").delete().eq("tenant_id", tenantId).eq("id", cid);
     if (error) throw error;
-    return { success: true, data: { id }, message: "Customer deleted successfully" };
+    return { success: true, data: { id }, message: "Customer and all their records deleted" };
   },
 
   async getNextCustomerNumberForDisplay() {
@@ -735,6 +807,7 @@ export const adminAPI = {
     const invoices = rows.map((r) => ({
       invoiceId: r.invoice_id,
       customerId: r.customer_id,
+      code: custMap[r.customer_id]?.customer_code || null,
       name: r.customer_name,
       phone: r.customer_phone,
       total: r.total_amount,
@@ -930,11 +1003,12 @@ export const adminAPI = {
         phone: data.phone,
         upiId: data.upi_id,
         gstNumber: data.gst_number,
+        waOnPurchase: data.wa_on_purchase || false,
       },
     };
   },
 
-  async updateTenantProfile({ name, phone, upiId, gstNumber } = {}) {
+  async updateTenantProfile({ name, phone, upiId, gstNumber, waOnPurchase } = {}) {
     const tenantId = await getActiveTenantId();
     if (!name || !name.trim()) throw new Error("Shop name is required");
     const { data, error } = await supabase
@@ -944,6 +1018,7 @@ export const adminAPI = {
         phone: phone || null,
         upi_id: upiId || null,
         gst_number: gstNumber || null,
+        wa_on_purchase: !!waOnPurchase,
       })
       .eq("id", tenantId)
       .select()

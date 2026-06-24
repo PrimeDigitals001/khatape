@@ -21,6 +21,7 @@ create table if not exists tenants (
   gst_number  text,
   upi_id      text,
   phone       text,
+  wa_on_purchase boolean not null default false,  -- auto-open WhatsApp after each POS sale
   branding    jsonb not null default '{}'::jsonb,
   created_at  timestamptz not null default now()
 );
@@ -61,8 +62,11 @@ create table if not exists items (
   pricing_mode  text not null default 'packaged',  -- 'packaged' | 'loose'
   rate_unit     text not null default 'piece',     -- piece | g | kg | ml | l
   image         text,                       -- URL or base64 data-uri
+  item_code     text,                       -- per-tenant display code, e.g. "CH-I1"
+  sequence_number int,                      -- per-tenant running number
   created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
+  updated_at    timestamptz not null default now(),
+  unique (tenant_id, item_code)
 );
 create index if not exists items_tenant_idx on items(tenant_id);
 
@@ -78,6 +82,7 @@ create table if not exists customers (
   rfid            text,
   customer_code   text,        -- per-tenant display id, e.g. "CD1"
   sequence_number int,         -- per-tenant running number
+  suspended       boolean not null default false,  -- temporarily stop service, keep records
   public_token    text default gen_random_uuid()::text,  -- self-view link token
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
@@ -175,6 +180,21 @@ create index if not exists standing_orders_tenant_idx on standing_orders(tenant_
 create index if not exists standing_orders_customer_idx on standing_orders(tenant_id, customer_id);
 
 -- =====================================================================
+-- 7d. Blocked cards — a stolen/replaced RFID stays unusable (can't be tapped
+--     to reach the reassigned account, nor re-registered to someone else).
+-- =====================================================================
+create table if not exists blocked_cards (
+  id          uuid primary key default gen_random_uuid(),
+  tenant_id   uuid not null references tenants(id) on delete cascade,
+  rfid        text not null,
+  customer_id text,                 -- who it used to belong to
+  reason      text,
+  created_at  timestamptz not null default now(),
+  unique (tenant_id, rfid)
+);
+create index if not exists blocked_cards_tenant_idx on blocked_cards(tenant_id, rfid);
+
+-- =====================================================================
 -- 8. Audit log
 -- =====================================================================
 create table if not exists audit_log (
@@ -247,7 +267,7 @@ create policy tenant_modules_write on tenant_modules for all
 do $$
 declare t text;
 begin
-  foreach t in array array['items','customers','transactions','invoices','payments','standing_orders','audit_log']
+  foreach t in array array['items','customers','transactions','invoices','payments','standing_orders','blocked_cards','audit_log']
   loop
     execute format('drop policy if exists %1$s_rw on %1$s;', t);
     execute format($f$

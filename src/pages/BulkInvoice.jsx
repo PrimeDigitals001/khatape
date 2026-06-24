@@ -53,7 +53,7 @@ export default function BulkInvoice() {
   const downloadPdf = async (inv) => {
     const blob = await buildInvoicePdf({
       shop: shop || {},
-      customer: { name: inv.name, phone: inv.phone },
+      customer: { name: inv.name, phone: inv.phone, code: inv.code },
       orders: inv.orders || [],
       total: inv.total,
       invoiceId: inv.invoiceId,
