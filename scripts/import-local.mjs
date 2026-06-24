@@ -94,8 +94,9 @@ const customerRows = shop.customers.map((c) => {
 });
 await insertAll("customers", customerRows);
 
-// --- 2. Items (drop the huge base64 images) ----------------------------------
-const itemRows = shop.items.map((it) => ({
+// --- 2. Items (drop the huge base64 images; assign indexed codes CH-I1…) ------
+const codePrefix = (customerRows.find((c) => c.customer_code)?.customer_code || "SH").replace(/[0-9].*$/, "") || "SH";
+const itemRows = shop.items.map((it, i) => ({
   id: randomUUID(),
   tenant_id: TID,
   name: it.name || "Item",
@@ -104,6 +105,8 @@ const itemRows = shop.items.map((it) => ({
   pricing_mode: "packaged",
   rate_unit: "piece",
   image: null, // base64 images dropped to keep the practice DB lean
+  item_code: `${codePrefix}-I${i + 1}`,
+  sequence_number: i + 1,
   created_at: isoTs(it.createdAt) || new Date().toISOString(),
   updated_at: isoTs(it.updatedAt) || new Date().toISOString(),
 }));

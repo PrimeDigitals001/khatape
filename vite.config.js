@@ -5,6 +5,9 @@ import tailwindcss from "@tailwindcss/vite";
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Khatape uses its own dev port (5180) so it never collides with another
+  // project on Vite's default 5173.
+  server: { port: 5180 },
   // CSP temporarily disabled for Firebase Functions testing
   // server: {
   //   headers: {
